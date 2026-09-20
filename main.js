@@ -49,7 +49,7 @@ function addProduct(newProduct, fail = false) {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (fail) {
-        return reject(new Error("Database save error"));
+        reject(new Error("Database save error"));
       }
       
       products.push(newProduct);
@@ -105,41 +105,40 @@ app.get('/products/:id',  (req, res) => {
 });
 
 app.post('/products', async (req, res) => {
+  const { name, price, category, image } = req.body;
+  
+  if (
+    typeof name !== 'string' || name.trim() === '' ||
+    typeof price !== 'number' || price <= 0 ||
+    typeof category !== 'string' || category.trim() === ''
+  ) {
+    return res.status(422).json({ message: "Invalid product input data" });
+  }
+  
+  const isDuplicate = products.some(product => product.name.toLowerCase() === name.trim().toLowerCase());
+  if (isDuplicate) {
+    return res.status(409).json({ message: "Product name already exists" });
+  }
+  
+  const productImage = (typeof image === 'string') ? image.trim() : "";
+  
+  const newId = products.length > 0 ? products[products.length - 1].id + 1 : 1;
+  
+  const newProduct = {
+    id: newId,
+    name: name.trim(),
+    price: price,
+    category: category.trim(),
+    image: productImage
+  };
+  
+  const fail = req.query.fail === 'true';
   try {
-    const { name, price, category, image } = req.body;
-
-    if (
-      typeof name !== 'string' || name.trim() === '' ||
-      typeof price !== 'number' || price <= 0 ||
-      typeof category !== 'string' || category.trim() === ''
-    ) {
-      return res.status(422).json({ message: "Invalid product input data" });
-    }
-
-    const isDuplicate = products.some(product => product.name.toLowerCase() === name.trim().toLowerCase());
-    if (isDuplicate) {
-      return res.status(409).json({ message: "Product name already exists" });
-    }
-
-    const productImage = (typeof image === 'string') ? image.trim() : "";
-
-    const newId = products.length > 0 ? products[products.length - 1].id + 1 : 1;
-
-    const newProduct = {
-      id: newId,
-      name: name.trim(),
-      price: price,
-      category: category.trim(),
-      image: productImage
-    };
-
-    const fail = req.query.fail === 'true';
     const savedProduct = await addProduct(newProduct, fail);
-    res.status(201).json(savedProduct);
-
+    return res.status(201).json(savedProduct);
   } catch (error) {
     console.error(error.message);
-    res.status(500).json({ message: "Failed to save product", error: error.message });
+    return res.status(500).json({ message: "Failed to save product", error: error.message });
   }
 });
 
